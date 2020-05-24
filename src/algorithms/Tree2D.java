@@ -6,6 +6,15 @@ import java.util.ArrayList;
 public class Tree2D {
   private Point root;
   private ArrayList<Tree2D> subtrees;
+  
+  @Override
+  public String toString() {
+	  String resultat = "racine : " + root.toString() + "\nfeuilles :\n";
+	  for(Tree2D subtree : subtrees) {
+		  resultat += subtree.toString();
+	  }
+	  return resultat;
+  }
 
   public Tree2D (Point p, ArrayList<Tree2D> trees){
     this.root=p;

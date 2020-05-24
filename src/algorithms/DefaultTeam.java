@@ -22,32 +22,71 @@ public class DefaultTeam {
 			this.p2 = p2;
 			this.longueur = longueur;
 		}
+		
+		@Override
+		public String toString() {
+			return "point 1 : " + p1 + "\npoint 2 : " + p2 + "\nlongueur : " + longueur;
+		}
 	}
 	
-	public ArrayList<Arete> getAretesS(ArrayList<Point> points_g, ArrayList<Point> points_s, int edgeThreshold) {
+	private boolean pointsEquals(Point p1, Point p2) {
+		if(p1.x == p2.x && p1.y == p2.y) return true;
+		return false;
+	}
+	
+	public LinkedList<Arete> getAretesS(ArrayList<Point> points_g, ArrayList<Point> points_s, int edgeThreshold) {
+		System.out.println("getAretesS()");
 		int[][] matrice_directions = calculShortestPaths(points_g, edgeThreshold);
+		System.out.println("a");
 		
 		HashMap<Point,ArrayList<Point>> aretes_traitees = new HashMap<>();
 		for(Point point : points_s) aretes_traitees.put(point, new ArrayList<>());
-		ArrayList<Arete> aretes_s = new ArrayList<>();
+		LinkedList<Arete> aretes_s = new LinkedList<>();
+		
+		System.out.println("b");
 		
 		for(Point point : points_s) {
 			for(Point voisin : points_s) {
+				/*if(voisin != point) {
+					System.out.println("cond : " + (voisin != point) + " " + (voisin.distance(point) <= edgeThreshold ) + " " + (!aretes_traitees.get(voisin).contains(point)));
+					if(!aretes_traitees.get(voisin).contains(point)) System.out.println(aretes_traitees.get(voisin));
+				}*/
 				if(voisin != point
-				&& voisin.distance(point) <= edgeThreshold 
+				//&& voisin.distance(point) <= edgeThreshold 
 				&& !aretes_traitees.get(voisin).contains(point)) {
+					System.out.println("Bonnes conditions");
 					Arete arete = new Arete(point, voisin, (double) 0);
 					Point current_point = point;
-					while(true) {
-						if(current_point == voisin) break;
+					System.out.println(point);
+					System.out.println(voisin);
+					System.out.println("avant le while");
+					int aaa = 0;
+					while(!pointsEquals(current_point, voisin) && aaa < 5000) {
+						System.out.print("-" + aaa);
 						Point temp = points_g.get(matrice_directions[points_g.indexOf(current_point)][points_g.indexOf(voisin)]);
+						System.out.print(temp + " " + current_point + " " + voisin + " " + (!pointsEquals(current_point, voisin)) + " ///// ");
+						/*
+						for(int i = 0; i < current_point.toString().length(); i++) {
+							char c1 = current_point.toString().charAt(i);
+							char c2 = voisin.toString().charAt(i);
+							char [] tab = {c1, c2};
+							System.out.println(String.copyValueOf(tab));
+							System.out.println(c1 == c2);
+						}
+						*/
 						arete.longueur += current_point.distance(temp);
 						current_point = temp;
+						aaa++;
 					}
+					System.out.println("ok\n");
+					System.out.println(arete);
+					aretes_s.add(arete);
 					aretes_traitees.get(point).add(voisin);
+					System.out.println("point traité");
 				}
 			}
 		}		
+		System.out.println("Voilà ! getAretesS() est fini !!!!!!!!!");
 		return aretes_s;
 		
 	}
@@ -61,6 +100,7 @@ public class DefaultTeam {
 	 * @return une matrice à deux dimensions
 	 */
 	public int[][] calculShortestPaths(ArrayList<Point> points, int edgeThreshold) {
+		System.out.println("calculShortestPaths()");
 		int[][] paths=new int[points.size()][points.size()];
 		for (int i=0;i<paths.length;i++) for (int j=0;j<paths.length;j++) paths[i][j]=i;
 
@@ -96,7 +136,7 @@ public class DefaultTeam {
 	
 	
 	
-	public Tree2D kruskal(ArrayList<Point> points_global) {
+	public Tree2D kruskal(ArrayList<Point> points_global, ArrayList<Point> pointsS, int edgeThreshold) {
 		int i = 0;
 		
 		HashMap<Point, Integer> subgraphs = new HashMap<>();
@@ -110,8 +150,15 @@ public class DefaultTeam {
 		ArrayList<Point> points = new ArrayList<>();
 		points.addAll(points_global);
 		
+		liste_aretes = getAretesS(points, pointsS, edgeThreshold);
+		points = pointsS;
+		
 		
 		Point racine = points.get(0);
+		
+		
+		
+		/*
 		
 		for(Point p1 : points) {
 			for(Point p2 : points) {
@@ -120,6 +167,8 @@ public class DefaultTeam {
 				}
 			}
 		}
+		
+		*/
 		
 		
 		liste_aretes.sort((o1, o2) -> o1.longueur.compareTo(o2.longueur));
@@ -234,7 +283,10 @@ public class DefaultTeam {
 		return steinerTree;
 		*/
 		
-		return kruskal(points);
+		Tree2D res = kruskal(points, hitPoints, edgeThreshold);
+		System.out.println(res);
+		
+		return res;
 	}
 	
 	public Tree2D calculSteinerBudget(ArrayList<Point> points, int edgeThreshold, ArrayList<Point> hitPoints) {
