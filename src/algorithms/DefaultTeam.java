@@ -95,7 +95,7 @@ public class DefaultTeam {
 					// On parcours tout le chemin d'un bout à l'autre de l'arete pour connaitre la longueur de celle-ci
 					while(!pointsEquals(current_point, p2)) {
 					//while(current_point != p2) {
-						System.out.println(current_point + " --- " + p2);
+						//System.out.println(current_point + " --- " + p2);
 						Point temp = points_g.get(matrice_directions[points_g.indexOf(current_point)][points_g.indexOf(p2)]);
 						arete.longueur = arete.longueur + current_point.distance(temp);
 						current_point = temp;
@@ -119,7 +119,7 @@ public class DefaultTeam {
 		HashMap<Point,ArrayList<Point>> adj = new HashMap<>();
 		for(Point point : points_g) adj.put(point, new ArrayList<>());
 		
-		System.out.println(aretes_s.size());
+		//System.out.println(aretes_s.size());
 		int moy = 0;
 		
 		Collections.reverse(aretes_s);
@@ -139,20 +139,20 @@ public class DefaultTeam {
 				}
 				current_point = temp;
 				
-				System.out.print(" -> " + temp);
+				//System.out.print(" -> " + temp);
 				moy++;
 				
 				if(!points_res.contains(current_point)) points_res.add(current_point);
 			}
-			System.out.println("");
+			//System.out.println("");
 		}
 		
 		for(Point p1 : adj.keySet()) {
 			for(Point p2 : adj.get(p1)) {
-				System.out.print("[" + p1.x + " " + p1.y + " - " + p2.x + " " + p2.y + "]");
+				//System.out.print("[" + p1.x + " " + p1.y + " - " + p2.x + " " + p2.y + "]");
 				aretes_res.add(new Arete(p1, p2));
 			}
-			System.out.println("");
+			//System.out.println("");
 		}
 		
 		
@@ -168,7 +168,7 @@ public class DefaultTeam {
 	 * @return une matrice à deux dimensions
 	 */
 	public int[][] calculShortestPaths(ArrayList<Point> points, int edgeThreshold) {
-		System.out.println("calculShortestPaths()");
+		//System.out.println("calculShortestPaths()");
 		int[][] paths=new int[points.size()][points.size()];
 		for (int i=0;i<paths.length;i++) for (int j=0;j<paths.length;j++) paths[i][j]=i;
 
@@ -337,6 +337,32 @@ public class DefaultTeam {
 	}
 	
 	
+	private Tree2D edgesToTree(LinkedList<Arete> aretes_K, Point root) {
+		LinkedList<Arete> remainder = new LinkedList<Arete>();
+		ArrayList<Point> subTreeRoots = new ArrayList<Point>();
+		Arete current;
+		while (aretes_K.size()!=0) {
+			current = aretes_K.remove(0);
+			if (current.p1.equals(root)) {
+				subTreeRoots.add(current.p2);
+			} else {
+				if (current.p2.equals(root)) {
+					subTreeRoots.add(current.p1);
+				} else {
+					remainder.add(current);
+				}
+			}
+		}
+
+		ArrayList<Tree2D> subTrees = new ArrayList<Tree2D>();
+		for (Point subTreeRoot: subTreeRoots) subTrees.add(edgesToTree((LinkedList<Arete>)remainder.clone(),subTreeRoot));
+
+		return new Tree2D(root, subTrees);
+	}
+	
+	
+	
+	
 	
 	
 	
@@ -357,6 +383,86 @@ public class DefaultTeam {
 		//System.out.println(res);
 		return res;
 	}
+	
+	
+	
+	
+	
+	private boolean contains(LinkedList<Arete> edges,Point p,Point q){
+		for (Arete e:edges){
+			if (e.p1.equals(p) && e.p2.equals(q) ||
+					e.p1.equals(q) && e.p2.equals(p) ) return true;
+		}
+		return false;
+	}
+	
+	private LinkedList<Arete> sort(LinkedList<Arete> edges) {
+		if (edges.size()==1) return edges;
+
+		LinkedList<Arete> left = new LinkedList<Arete>();
+		LinkedList<Arete> right = new LinkedList<Arete>();
+		int n=edges.size();
+		for (int i=0;i<n/2;i++) { left.add(edges.remove(0)); }
+		while (edges.size()!=0) { right.add(edges.remove(0)); }
+		left = sort(left);
+		right = sort(right);
+
+		LinkedList<Arete> result = new LinkedList<Arete>();
+		while (left.size()!=0 || right.size()!=0) {
+			if (left.size()==0) { result.add(right.remove(0)); continue; }
+			if (right.size()==0) { result.add(left.remove(0)); continue; }
+			if (left.get(0).longueur < right.get(0).longueur) result.add(left.remove(0));
+			else result.add(right.remove(0));
+		}
+		return result;
+	}
+	
+	class NameTag {
+		private ArrayList<Point> points;
+		private int[] tag;
+		protected NameTag(ArrayList<Point> points){
+			this.points=(ArrayList<Point>)points.clone();
+			tag=new int[points.size()];
+			for (int i=0;i<points.size();i++) tag[i]=i;
+		}
+		protected void reTag(int j, int k){
+			for (int i=0;i<tag.length;i++) if (tag[i]==j) tag[i]=k;
+		}
+		protected int tag(Point p){
+			for (int i=0;i<points.size();i++) if (p.equals(points.get(i))) return tag[i];
+			return 0xBADC0DE;
+		}
+	}
+
+	
+	
+	public LinkedList<Arete> kruskalProf(ArrayList<Point> points, LinkedList<Arete> liste_aretes, int edgeThreshold) {		
+		LinkedList<Arete> edges = new LinkedList<Arete>();
+		/*
+		for (Point p: points) {
+			for (Point q: points) {
+				if (p.equals(q) || contains(edges,p,q)) continue;
+				edges.add(new Arete(p,q));
+			}
+		}
+		*/
+		edges.addAll(liste_aretes);
+		edges = sort(edges);
+
+		LinkedList<Arete> kruskal = new LinkedList<Arete>();
+		Arete current;
+		NameTag forest = new NameTag(points);
+		while (edges.size()!=0) {
+			current = edges.remove(0);
+			if (forest.tag(current.p1)!=forest.tag(current.p2)) {
+				kruskal.add(current);
+				forest.reTag(forest.tag(current.p1),forest.tag(current.p2));
+			}
+		}
+
+		return kruskal;
+	}
+
 
 	
 	
@@ -372,10 +478,10 @@ public class DefaultTeam {
 
 		// Kruskal sur K
 		//Tree2D res = kruskal(hitPoints, aretesS);
-		LinkedList<Arete> aretes_K = kruskal(hitPoints, aretesS);
+		LinkedList<Arete> aretes_K = kruskalProf(hitPoints, aretesS, edgeThreshold);
 		
 		// appliquer K à G -> H
-		/*
+		
 		Pair<ArrayList<Point>, LinkedList<Arete>> paire = applyT0toG(points, getAretes(points, edgeThreshold), hitPoints, aretes_K, matrice_directions);
 		ArrayList<Point> points_H = (ArrayList<Point>) paire.first;
 		LinkedList<Arete> aretes_H = (LinkedList<Arete>) paire.second;
@@ -383,8 +489,8 @@ public class DefaultTeam {
 		System.out.println("points_H : " + points_H.size());
 		System.out.println("aretes_H : " + aretes_H.size());
 		
-		*/
 		
+		/*
 		
 		HashMap<Point, ArrayList<Point>> voisins = new HashMap<>();
 		for(Point point : hitPoints) voisins.put(point, new ArrayList<Point>());
@@ -397,9 +503,17 @@ public class DefaultTeam {
 			voisins.get(arete.p2).add(arete.p1);
 		}
 		
-		Tree2D res = getFils(voisins, hitPoints.get(0));
+		//Tree2D res = getFils(voisins, hitPoints.get(0));
+		*/
 		
-		System.out.println("aretes_res : " + getAretesFromTree(res).size());
+		LinkedList<Arete> aretes_finales = kruskalProf(points_H, aretes_H, edgeThreshold);
+		
+		System.out.println("aretes_finales : " + aretes_finales.size());
+		
+		Tree2D res = edgesToTree(aretes_finales, aretes_finales.get(0).p1);
+
+		
+		//System.out.println("aretes_res : " + getAretesFromTree(res).size());
 		
 		
 		
