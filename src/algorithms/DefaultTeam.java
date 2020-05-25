@@ -72,6 +72,46 @@ public class DefaultTeam {
 		
 	}
 	
+	
+	public LinkedList<Arete> getAretesSnew(ArrayList<Point> points_g, ArrayList<Point> points_s, int[][] matrice_directions) {
+		// initialisation d'une structure de données pour savoir quelles aretes on a déjà traité (sinon elles seront toutes en double)
+		HashMap<Point, ArrayList<Point>> deja_vu = new HashMap<>();
+		for(Point point : points_s) {
+			deja_vu.put(point, new ArrayList<>());
+			deja_vu.get(point).add(point);
+		}
+		
+		
+		
+		// résultat
+		LinkedList<Arete> aretes = new LinkedList<>();
+		
+		for(Point p1 : points_s) {
+			for(Point p2 : points_s) {
+				if(!deja_vu.get(p2).contains(p1)) {
+					Point current_point = p1;
+					Arete arete = new Arete(p1, p2, (double) 0);
+					
+					// On parcours tout le chemin d'un bout à l'autre de l'arete pour connaitre la longueur de celle-ci
+					while(!pointsEquals(current_point, p2)) {
+					//while(current_point != p2) {
+						System.out.println(current_point + " --- " + p2);
+						Point temp = points_g.get(matrice_directions[points_g.indexOf(current_point)][points_g.indexOf(p2)]);
+						arete.longueur = arete.longueur + current_point.distance(temp);
+						current_point = temp;
+					}
+					aretes.add(arete);
+					
+					// On mémorise cette arete
+					deja_vu.get(p1).add(p2);
+				}
+			}
+		}
+		
+		return aretes;
+	}
+	
+	
 	public Pair<ArrayList<Point>, LinkedList<Arete>> applyT0toG(ArrayList<Point> points_g, LinkedList<Arete> aretes_g, ArrayList<Point> points_s, LinkedList<Arete> aretes_s, int[][] matrice_directions){
 		ArrayList<Point> points_res = new ArrayList<>();
 		LinkedList<Arete> aretes_res = new LinkedList<>();
@@ -174,9 +214,10 @@ public class DefaultTeam {
 	}
 	
 	
-	public Tree2D kruskal(ArrayList<Point> points_global, LinkedList<Arete> liste_aretes) {		
+	public LinkedList<Arete> kruskal(ArrayList<Point> points_global, LinkedList<Arete> liste_aretes) {		
 		HashMap<Point, Integer> subgraphs = new HashMap<>();
 		Integer subgraph_count = 0;
+		 LinkedList<Arete> result = new LinkedList<>();
 		
 		HashMap<Point, ArrayList<Point>> voisins = new HashMap<>();
 		ArrayList<Point> points = new ArrayList<>();
@@ -185,8 +226,27 @@ public class DefaultTeam {
 		
 		liste_aretes.sort((o1, o2) -> o1.longueur.compareTo(o2.longueur));
 		
-		while (points.size() > 0) {
+		/*
+		//System.out.println(liste_aretes);
+		System.out.println("liste_aretes.size()  : " + liste_aretes.size());
+		System.out.println("points_global.size() : " + points_global.size());
+		
+		try {
+			Thread.sleep(500L);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		*/
+		while (points.size() > 0 && liste_aretes.size() > 0) {
+			//System.out.println(points);
+			//System.out.println(points.size());
+			
 			Arete arete = liste_aretes.pop();
+			
+			//System.out.print(!subgraphs.containsKey(arete.p1));
+			//System.out.print(!subgraphs.containsKey(arete.p2));
+			//System.out.println((subgraphs.containsKey(arete.p1) && subgraphs.containsKey(arete.p2) && (subgraphs.get(arete.p1) != subgraphs.get(arete.p2))));
 			if(
 					!subgraphs.containsKey(arete.p1)
 					||
@@ -209,10 +269,11 @@ public class DefaultTeam {
 					subgraphPropagation(voisins_tampon, subgraphs, arete.p1, subgraphs.get(arete.p2));
 				} 
 				
-				if(!voisins.containsKey(arete.p1)) voisins.put(arete.p1, new ArrayList());
-				if(!voisins.containsKey(arete.p2)) voisins.put(arete.p2, new ArrayList());
+				if(!voisins.containsKey(arete.p1)) voisins.put(arete.p1, new ArrayList<Point>());
+				if(!voisins.containsKey(arete.p2)) voisins.put(arete.p2, new ArrayList<Point>());
 				voisins.get(arete.p2).add(arete.p1);
 				voisins.get(arete.p1).add(arete.p2);
+				result.add(arete);
 
 				if(points.contains(arete.p1)) points.remove(arete.p1);
 				if(points.contains(arete.p2)) points.remove(arete.p2);
@@ -220,7 +281,29 @@ public class DefaultTeam {
 			}
 		}
 		
-		return getFils(voisins, racine);
+		// Au cas où il y ait plusieurs graphes ou des points tous seuls, on prends le plus gros graphe
+		
+		HashMap<Integer, Integer> subgraphsSize = new HashMap<>();
+		
+		for(Point point : subgraphs.keySet()) {
+			if(!subgraphsSize.containsKey(subgraphs.get(point))) subgraphsSize.put(subgraphs.get(point), 0);
+			subgraphsSize.put(subgraphs.get(point), subgraphsSize.get(subgraphs.get(point)) + 1);
+		}
+		int max = 0;
+		int biggest_subgraph = 0;
+		for(Integer subgraph : subgraphsSize.keySet()) {
+			if(subgraphsSize.get(subgraph) >= max) {
+				max = subgraphsSize.get(subgraph);
+				biggest_subgraph = subgraph;
+			}
+		}
+		for(Point point : subgraphs.keySet()) {
+			if(subgraphs.get(point) == biggest_subgraph) racine = point;
+		}
+		
+		
+		
+		return result;
 	}
 	
 	private void subgraphPropagation(HashMap<Point, ArrayList<Point>> voisins, HashMap<Point, Integer> subgraphs, Point point, Integer color) {
@@ -246,6 +329,7 @@ public class DefaultTeam {
 		
 		ArrayList<Tree2D> fils = new ArrayList<>();
 		for(Point voisin : voisins_temp) {
+			//voisins.get(voisin).remove(point); ça me parait bizarre qu'il faille pas emttre ça
 			fils.add(getFils(voisins, voisin));
 		}
 		
@@ -273,26 +357,54 @@ public class DefaultTeam {
 		//System.out.println(res);
 		return res;
 	}
-	
+
 	
 	
 	
 	
 	
 	public Tree2D calculSteiner(ArrayList<Point> points, int edgeThreshold, ArrayList<Point> hitPoints) {
+		
 		int[][] matrice_directions = calculShortestPaths(points, edgeThreshold);
 		
 		// Construction de l'arbre K
-		LinkedList<Arete> aretesS = getAretesS(points, hitPoints, matrice_directions);
+		LinkedList<Arete> aretesS = getAretesSnew(points, hitPoints, matrice_directions);
 
 		// Kruskal sur K
-		Tree2D res = kruskal(hitPoints, aretesS);
+		//Tree2D res = kruskal(hitPoints, aretesS);
+		LinkedList<Arete> aretes_K = kruskal(hitPoints, aretesS);
 		
 		// appliquer K à G -> H
-		Pair paire = applyT0toG(points, getAretes(points, edgeThreshold), hitPoints, getAretesFromTree(res), matrice_directions);
+		/*
+		Pair<ArrayList<Point>, LinkedList<Arete>> paire = applyT0toG(points, getAretes(points, edgeThreshold), hitPoints, aretes_K, matrice_directions);
 		ArrayList<Point> points_H = (ArrayList<Point>) paire.first;
 		LinkedList<Arete> aretes_H = (LinkedList<Arete>) paire.second;
 		
+		System.out.println("points_H : " + points_H.size());
+		System.out.println("aretes_H : " + aretes_H.size());
+		
+		*/
+		
+		
+		HashMap<Point, ArrayList<Point>> voisins = new HashMap<>();
+		for(Point point : hitPoints) voisins.put(point, new ArrayList<Point>());
+		
+		for(Arete arete : aretes_K) {
+			//if(!voisins.get(arete.p1).contains(arete.p2)) voisins.get(arete.p1).add(arete.p2);
+			//if(!voisins.get(arete.p2).contains(arete.p1)) voisins.get(arete.p2).add(arete.p1);
+			// normalement ça ne fait rien car le cas est traité
+			voisins.get(arete.p1).add(arete.p2);
+			voisins.get(arete.p2).add(arete.p1);
+		}
+		
+		Tree2D res = getFils(voisins, hitPoints.get(0));
+		
+		System.out.println("aretes_res : " + getAretesFromTree(res).size());
+		
+		
+		
+		return res;
+		/*
 		
 		// Kruskal sur H
 		res = kruskal(points_H, aretes_H);
@@ -315,6 +427,7 @@ public class DefaultTeam {
 
 		
 		return res;
+		*/
 	}
 	
 	public Tree2D calculSteinerBudget(ArrayList<Point> points, int edgeThreshold, ArrayList<Point> hitPoints) {
