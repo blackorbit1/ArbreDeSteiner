@@ -8,6 +8,8 @@ import java.util.LinkedList;
 
 
 public class DefaultTeam {
+	private static final int BUDGET = 1664;
+	
 	private class Arete {
 		public Point p1;
 		public Point p2;
@@ -157,103 +159,9 @@ public class DefaultTeam {
 	
 	
 	
-	public LinkedList<Arete> getAretes(ArrayList<Point> points, int edgeThreshold){
-		LinkedList<Arete> liste_aretes = new LinkedList<>();
-		for(Point p1 : points) {
-			for(Point p2 : points) {
-				if(p1 != p2 && p1.distance(p2) <= edgeThreshold) {
-					liste_aretes.add(new Arete(p1, p2));
-				}
-			}
-		}
-		return liste_aretes;
-	}
+
 	
 	
-	public LinkedList<Arete> kruskal(ArrayList<Point> points_global, LinkedList<Arete> liste_aretes) {		
-		HashMap<Point, Integer> subgraphs = new HashMap<>();
-		Integer subgraph_count = 0;
-		 LinkedList<Arete> result = new LinkedList<>();
-		
-		HashMap<Point, ArrayList<Point>> voisins = new HashMap<>();
-		ArrayList<Point> points = new ArrayList<>();
-		points.addAll(points_global);
-		Point racine = points.get(0);
-		
-		liste_aretes.sort((o1, o2) -> o1.longueur.compareTo(o2.longueur));
-
-		while (points.size() > 0 && liste_aretes.size() > 0) {
-
-			Arete arete = liste_aretes.pop();
-			if(
-					!subgraphs.containsKey(arete.p1)
-					||
-					!subgraphs.containsKey(arete.p2)
-					||
-					(subgraphs.containsKey(arete.p1) && subgraphs.containsKey(arete.p2) && (subgraphs.get(arete.p1) != subgraphs.get(arete.p2)))
-				) {
-				if(!subgraphs.containsKey(arete.p1) && !subgraphs.containsKey(arete.p2)) {
-					subgraphs.put(arete.p1, subgraph_count);
-					subgraphs.put(arete.p2, subgraph_count);
-					subgraph_count++;
-				} else if(!subgraphs.containsKey(arete.p1)) {
-					subgraphs.put(arete.p1, subgraphs.get(arete.p2));
-				} else if(!subgraphs.containsKey(arete.p2)) {
-					subgraphs.put(arete.p2, subgraphs.get(arete.p1));
-				} else {
-					subgraphs.put(arete.p1, subgraphs.get(arete.p2));
-					HashMap<Point, ArrayList<Point>> voisins_tampon = new HashMap<>();
-					voisins_tampon.putAll(voisins);
-					subgraphPropagation(voisins_tampon, subgraphs, arete.p1, subgraphs.get(arete.p2));
-				} 
-				
-				if(!voisins.containsKey(arete.p1)) voisins.put(arete.p1, new ArrayList<Point>());
-				if(!voisins.containsKey(arete.p2)) voisins.put(arete.p2, new ArrayList<Point>());
-				voisins.get(arete.p2).add(arete.p1);
-				voisins.get(arete.p1).add(arete.p2);
-				result.add(arete);
-
-				if(points.contains(arete.p1)) points.remove(arete.p1);
-				if(points.contains(arete.p2)) points.remove(arete.p2);
-				
-			}
-		}
-		
-		// Au cas où il y ait plusieurs graphes ou des points tous seuls, on prends le plus gros graphe
-		HashMap<Integer, Integer> subgraphsSize = new HashMap<>();
-		
-		for(Point point : subgraphs.keySet()) {
-			if(!subgraphsSize.containsKey(subgraphs.get(point))) subgraphsSize.put(subgraphs.get(point), 0);
-			subgraphsSize.put(subgraphs.get(point), subgraphsSize.get(subgraphs.get(point)) + 1);
-		}
-		int max = 0;
-		int biggest_subgraph = 0;
-		for(Integer subgraph : subgraphsSize.keySet()) {
-			if(subgraphsSize.get(subgraph) >= max) {
-				max = subgraphsSize.get(subgraph);
-				biggest_subgraph = subgraph;
-			}
-		}
-		for(Point point : subgraphs.keySet()) {
-			if(subgraphs.get(point) == biggest_subgraph) racine = point;
-		}
-		
-		
-		
-		return result;
-	}
-	
-	private void subgraphPropagation(HashMap<Point, ArrayList<Point>> voisins, HashMap<Point, Integer> subgraphs, Point point, Integer color) {
-		ArrayList<Point> voisins_temp = new ArrayList<>();
-		if(voisins.containsKey(point)) {
-			voisins_temp.addAll(voisins.get(point));
-			voisins.remove(point);
-		} 
-		for(Point voisin : voisins_temp) {
-			subgraphs.put(voisin, color);
-			subgraphPropagation(voisins, subgraphs, voisin, color);
-		}
-	}
 	
 	
 	private Tree2D edgesToTree(LinkedList<Arete> aretes_K, Point root) {
@@ -289,7 +197,17 @@ public class DefaultTeam {
 	
 	
 	
-	
+	public LinkedList<Arete> getAretesFromPoints(ArrayList<Point> points, int edgeThreshold){
+		LinkedList<Arete> liste_aretes = new LinkedList<>();
+		for(Point p1 : points) {
+			for(Point p2 : points) {
+				if(p1 != p2 && p1.distance(p2) <= edgeThreshold) {
+					liste_aretes.add(new Arete(p1, p2));
+				}
+			}
+		}
+		return liste_aretes;
+	}
 	
 	
 	
@@ -343,23 +261,117 @@ public class DefaultTeam {
 
 	
 	
-	public LinkedList<Arete> kruskalProf(ArrayList<Point> points, LinkedList<Arete> liste_aretes, int edgeThreshold) {		
+	public LinkedList<Arete> kruskal(ArrayList<Point> points, LinkedList<Arete> liste_aretes) {		
 		LinkedList<Arete> edges = new LinkedList<Arete>();
 		edges.addAll(liste_aretes);
 		edges = sort(edges);
 
-		LinkedList<Arete> kruskal = new LinkedList<Arete>();
+		LinkedList<Arete> resultat = new LinkedList<Arete>();
 		Arete current;
 		NameTag forest = new NameTag(points);
 		while (edges.size()!=0) {
 			current = edges.remove(0);
 			if (forest.tag(current.p1)!=forest.tag(current.p2)) {
-				kruskal.add(current);
+				resultat.add(current);
 				forest.reTag(forest.tag(current.p1),forest.tag(current.p2));
 			}
 		}
 
-		return kruskal;
+		return resultat;
+	}
+	
+	
+	private class Segment {
+		public int budget;
+		
+		public LinkedList<Arete> aretes_temp;
+		public Point last_point;
+		public int dist_act = 0; // le cout de l'arbre
+		public int val_act = 0; // le nb d'aretes contenues dans l'arbre
+		
+		public LinkedList<Arete> aretes;
+		public int dist_max = Integer.MAX_VALUE;
+		public int val_max = 0;
+	
+		
+		public Segment(int budget, Point point) {
+			this.budget = budget;
+			this.last_point = point;
+			this.aretes_temp = new LinkedList<>();
+			this.aretes = new LinkedList<>();
+		}
+		
+		public String toString() {
+			return  ( "aretes_temp : " + aretes_temp + "\n"
+					+ "last_point :  " + last_point + "\n"
+					+ "dist_act :    " + dist_act + "\n"
+					+ "val_act :     " + aretes_temp.size()  + "\n"
+					+ "\n"
+					+ "aretes :      " + aretes + "\n"
+					+ "dist_max :    " + dist_max + "\n"
+					+ "val_max :     " + aretes.size()  + "\n"
+					);
+		}
+		
+		public void addPoint(Point point) {
+			if((dist_act + last_point.distance(point)) <= budget) {
+				aretes_temp.addFirst(new Arete(last_point, point));
+				dist_act += last_point.distance(point);
+				//val_act++;
+				
+				if(aretes_temp.size() > aretes.size() 
+				|| (aretes_temp.size() == aretes.size() && dist_act < dist_max)) {
+					aretes = new LinkedList<>();
+					aretes.addAll(aretes_temp);
+					val_max = val_act;
+					dist_max = dist_act;
+				}
+				
+				last_point = point;
+				
+			} else if(last_point.distance(point) > dist_act) {
+				aretes_temp = new LinkedList<>();
+				dist_act = 0;
+				//val_act = 0;
+				last_point = point;
+			} else {
+				while((dist_act + last_point.distance(point)) > budget) {
+					Arete temp = aretes_temp.removeLast();
+					dist_act -= temp.longueur;
+					//val_act--;
+				}
+				
+				aretes_temp.addFirst(new Arete(last_point, point));
+				dist_act += last_point.distance(point);
+				val_act++;
+				
+				last_point = point;
+			}
+		}
+		
+		
+		
+	}
+	
+	
+	public ArrayList<Segment> getSegmentCandidates(Tree2D arbre, int budget){
+		if(arbre.getSubTrees().size() == 0) {
+			ArrayList<Segment> result = new ArrayList<>();
+			result.add(new Segment(budget, arbre.getRoot()));
+			return result;
+		}
+		ArrayList<Segment> result = new ArrayList<>();
+		
+		for(Tree2D fils : arbre.getSubTrees()) {
+			for(Segment segment : getSegmentCandidates(fils, budget)) {
+				segment.addPoint(arbre.getRoot());
+				System.out.println(segment);
+				result.add(segment);
+			}
+		}
+		
+		return result;
+		
 	}
 
 
@@ -375,32 +387,48 @@ public class DefaultTeam {
 		LinkedList<Arete> aretesS = getAretesS(points, hitPoints, matrice_directions);
 
 		// Kruskal sur K
-		LinkedList<Arete> aretes_K = kruskalProf(hitPoints, aretesS, edgeThreshold);
+		LinkedList<Arete> aretes_K = kruskal(hitPoints, aretesS);
 		
 		// appliquer K à G -> H
-		Pair<ArrayList<Point>, LinkedList<Arete>> paire = applyT0toG(points, getAretes(points, edgeThreshold), hitPoints, aretes_K, matrice_directions);
+		Pair<ArrayList<Point>, LinkedList<Arete>> paire = applyT0toG(points, getAretesFromPoints(points, edgeThreshold), hitPoints, aretes_K, matrice_directions);
 		ArrayList<Point> points_H = (ArrayList<Point>) paire.first;
 		LinkedList<Arete> aretes_H = (LinkedList<Arete>) paire.second;
 		
 		// Kruskal sur H
-		LinkedList<Arete> aretes_finales = kruskalProf(points_H, aretes_H, edgeThreshold);
+		LinkedList<Arete> aretes_finales = kruskal(points_H, aretes_H);
 		
 
 		return edgesToTree(aretes_finales, aretes_finales.get(0).p1);
 	}
 	
 	public Tree2D calculSteinerBudget(ArrayList<Point> points, int edgeThreshold, ArrayList<Point> hitPoints) {
-		//REMOVE >>>>>
-		Tree2D leafX = new Tree2D(new Point(700,400),new ArrayList<Tree2D>());
-		Tree2D leafY = new Tree2D(new Point(700,500),new ArrayList<Tree2D>());
-		Tree2D leafZ = new Tree2D(new Point(800,450),new ArrayList<Tree2D>());
-		ArrayList<Tree2D> subTrees = new ArrayList<Tree2D>();
-		subTrees.add(leafX);
-		subTrees.add(leafY);
-		subTrees.add(leafZ);
-		Tree2D steinerTree = new Tree2D(new Point(750,450),subTrees);
-		//<<<<< REMOVE
-
-		return steinerTree;
+		// Execution des différentes étapes de steiner comme plus haut
+		int[][] matrice_directions = calculShortestPaths(points, edgeThreshold);
+		
+		LinkedList<Arete> aretes_S = getAretesS(points, hitPoints, matrice_directions);
+		LinkedList<Arete> aretes_K = kruskal(hitPoints, aretes_S);
+		
+		Pair<ArrayList<Point>, LinkedList<Arete>> paire = applyT0toG(points, getAretesFromPoints(points, edgeThreshold), hitPoints, aretes_K, matrice_directions);
+		LinkedList<Arete> aretes_finales = kruskal(paire.first, paire.second);
+		
+		
+		// 
+		Tree2D tree = edgesToTree(aretes_finales, hitPoints.get(0));
+		ArrayList<Segment> segments = getSegmentCandidates(tree, BUDGET);
+		
+		int score_max = 0;
+		Segment segment_max = new Segment(BUDGET, hitPoints.get(0));
+		
+		for(Segment segment : segments) {
+			if(segment.aretes.size() > score_max) {
+				segment_max = segment;
+				score_max = segment.aretes.size();
+			}
+		}
+		
+		if(score_max == 0) System.out.println("Impossible de construire un arbre avec ce budget");
+		
+		
+		return edgesToTree(segment_max.aretes, segment_max.aretes.get(0).p1);
 	}
 }
