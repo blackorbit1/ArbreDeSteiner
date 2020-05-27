@@ -41,6 +41,10 @@ public class DefaultTeam {
 		        this.first = first;
 		        this.second = second;
 		    }
+		    
+		    public boolean equals(Pair<F, S> paire2) {
+		    	return (paire2.first == this.first) && (paire2.second == this.second);
+		    }
 	}
 	
 	private boolean pointsEquals(Point p1, Point p2) {
@@ -287,7 +291,7 @@ public class DefaultTeam {
 		public LinkedList<Arete> aretes_temp;
 		public Point last_point;
 		public int dist_act = 0; // le cout de l'arbre
-		public int val_act = 0; // le nb d'aretes contenues dans l'arbre
+		public int val_act = 0; // le nb de hitPoint contenues dans l'arbre
 		
 		public LinkedList<Arete> aretes;
 		public int dist_max = Integer.MAX_VALUE;
@@ -305,22 +309,23 @@ public class DefaultTeam {
 			return  ( "aretes_temp : " + aretes_temp + "\n"
 					+ "last_point :  " + last_point + "\n"
 					+ "dist_act :    " + dist_act + "\n"
-					+ "val_act :     " + aretes_temp.size()  + "\n"
+					+ "val_act :     " + val_act  + "\n"
 					+ "\n"
 					+ "aretes :      " + aretes + "\n"
 					+ "dist_max :    " + dist_max + "\n"
-					+ "val_max :     " + aretes.size()  + "\n"
+					+ "val_max :     " + val_max  + "\n"
 					);
 		}
 		
-		public void addPoint(Point point) {
+		public void addPoint(Point point, boolean is_hitpoint) {
 			if((dist_act + last_point.distance(point)) <= budget) {
 				aretes_temp.addFirst(new Arete(last_point, point));
 				dist_act += last_point.distance(point);
-				//val_act++;
+				if(is_hitpoint) val_act++;
 				
-				if(aretes_temp.size() > aretes.size() 
-				|| (aretes_temp.size() == aretes.size() && dist_act < dist_max)) {
+				
+				if(val_act > val_max 
+				|| (val_act == val_max && dist_act < dist_max)) {
 					aretes = new LinkedList<>();
 					aretes.addAll(aretes_temp);
 					val_max = val_act;
@@ -354,7 +359,7 @@ public class DefaultTeam {
 	}
 	
 	
-	public ArrayList<Segment> getSegmentCandidates(Tree2D arbre, int budget){
+	public ArrayList<Segment> getSegmentCandidates(Tree2D arbre, int budget, ArrayList<Point> hitPoints){
 		if(arbre.getSubTrees().size() == 0) {
 			ArrayList<Segment> result = new ArrayList<>();
 			result.add(new Segment(budget, arbre.getRoot()));
@@ -363,14 +368,94 @@ public class DefaultTeam {
 		ArrayList<Segment> result = new ArrayList<>();
 		
 		for(Tree2D fils : arbre.getSubTrees()) {
-			for(Segment segment : getSegmentCandidates(fils, budget)) {
-				segment.addPoint(arbre.getRoot());
+			for(Segment segment : getSegmentCandidates(fils, budget, hitPoints)) {
+				segment.addPoint(arbre.getRoot(), hitPoints.contains(arbre.getRoot()));
 				System.out.println(segment);
 				result.add(segment);
 			}
 		}
 		
 		return result;
+		
+	}
+	
+	public Tree2D getPointAsRootOfTree(Tree2D arbre, Point point) {
+		if(point.equals(arbre.getRoot())) return arbre;
+		for(Tree2D fils : arbre.getSubTrees()) {
+			Tree2D temp = getPointAsRootOfTree(fils, point);
+			if(temp != null) return temp;
+		}
+		return null;
+	}
+	
+	public ArrayList<Segment> getBestBudgetedTree(
+			Tree2D arbre, 
+			ArrayList<Segment> segments, 
+			int score_actuel, 
+			int budget_actuel,
+			ArrayList<Pair<Point, Point>> visited_points, 
+			ArrayList<Point> hitPoints) {
+		
+		ArrayList<Point> candidate_points = new ArrayList<>();
+		for(Segment segment : segments) {
+			for(Arete arete : segment.aretes) {
+				if(!candidate_points.contains(arete.p1)) candidate_points.add(arete.p1);
+				if(!candidate_points.contains(arete.p2)) candidate_points.add(arete.p2);
+			}
+		}
+		
+		ArrayList<Tree2D> candidate_roots = new ArrayList<>();
+		for(Point point : candidate_points) {
+			Tree2D temp = getPointAsRootOfTree(arbre, point);
+			if(temp.getSubTrees().size() >= 2) {
+				for(Tree2D subtree : temp.getSubTrees()) {
+					boolean is_new = true;
+					for(Pair<Point, Point> paire : visited_points) {
+						if(paire.equals(new Pair<>(point, subtree.getRoot()))
+						|| paire.equals(new Pair<>(subtree.getRoot(), point))) is_new = false;
+					}
+					if (is_new) {
+						ArrayList<Tree2D> temp_list = new ArrayList<>();
+						temp_list.add(subtree);
+						candidate_roots.add(new Tree2D(point, temp_list));
+						visited_points.add(new Pair<>(point, subtree.getRoot()));
+					}
+					
+				}
+				
+				candidate_roots.add(temp);
+			}
+		}
+		
+		int score_max = 0;
+		Segment segment_max = new Segment(budget_actuel, hitPoints.get(0));
+		
+		for(Tree2D arbre_to_visit : candidate_roots) {
+			ArrayList<Segment> segments_candidate = getSegmentCandidates(arbre_to_visit, budget_actuel, hitPoints);
+			
+			
+			
+			for(Segment segment : segments_candidate) {
+				if(segment.aretes.size() > score_max) {
+					segment_max = segment;
+					score_max = segment.aretes.size();
+				}
+			}
+		}
+		
+		if(score_max > 0) {
+			segments.add(segment_max);
+			return getBestBudgetedTree(
+					arbre,
+					segments, 
+					score_actuel + score_max,
+					budget_actuel - segment_max.dist_max,
+					visited_points,
+					hitPoints);
+		}
+		
+		
+		return null;
 		
 	}
 
@@ -414,7 +499,7 @@ public class DefaultTeam {
 		
 		// 
 		Tree2D tree = edgesToTree(aretes_finales, hitPoints.get(0));
-		ArrayList<Segment> segments = getSegmentCandidates(tree, BUDGET);
+		ArrayList<Segment> segments = getSegmentCandidates(tree, BUDGET, hitPoints);
 		
 		int score_max = 0;
 		Segment segment_max = new Segment(BUDGET, hitPoints.get(0));
