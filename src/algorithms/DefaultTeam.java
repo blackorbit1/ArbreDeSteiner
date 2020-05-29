@@ -388,7 +388,7 @@ public class DefaultTeam {
 		return null;
 	}
 	
-	public ArrayList<Segment> getBestBudgetedTree(
+	public ArrayList<Arete> getBestBudgetedTree(
 			Tree2D arbre, 
 			ArrayList<Segment> segments, 
 			int score_actuel, 
@@ -428,6 +428,8 @@ public class DefaultTeam {
 		}
 		
 		int score_max = 0;
+		
+		
 		Segment segment_max = new Segment(budget_actuel, hitPoints.get(0));
 		
 		for(Tree2D arbre_to_visit : candidate_roots) {
@@ -443,6 +445,7 @@ public class DefaultTeam {
 			}
 		}
 		
+		
 		if(score_max > 0) {
 			segments.add(segment_max);
 			return getBestBudgetedTree(
@@ -455,7 +458,7 @@ public class DefaultTeam {
 		}
 		
 		
-		return null;
+		return segments;
 		
 	}
 
@@ -496,8 +499,11 @@ public class DefaultTeam {
 		Pair<ArrayList<Point>, LinkedList<Arete>> paire = applyT0toG(points, getAretesFromPoints(points, edgeThreshold), hitPoints, aretes_K, matrice_directions);
 		LinkedList<Arete> aretes_finales = kruskal(paire.first, paire.second);
 		
+		// TODO \/ \/ \/
+		// a faire pour chaque point du graphe : on pourrait n'examiner que les segments en partant d'un point
+		// qui n'appartient qu'à une seule arete  (si on commence on milieu, ça ne sert à rien et regarder si 
+		// la racine qu'on s'apprete à examiner est pas en fait le bout d'un autre segment
 		
-		// 
 		Tree2D tree = edgesToTree(aretes_finales, hitPoints.get(0));
 		ArrayList<Segment> segments = getSegmentCandidates(tree, BUDGET, hitPoints);
 		
