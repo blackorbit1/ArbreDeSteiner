@@ -168,7 +168,7 @@ public class DefaultTeam {
 	
 	
 	
-	private Tree2D edgesToTree(LinkedList<Arete> aretes_K, Point root) {
+	private Tree2D edgesToTreeAux(LinkedList<Arete> aretes_K, Point root) {
 		LinkedList<Arete> remainder = new LinkedList<Arete>();
 		ArrayList<Point> subTreeRoots = new ArrayList<Point>();
 		Arete current;
@@ -189,6 +189,12 @@ public class DefaultTeam {
 		for (Point subTreeRoot: subTreeRoots) subTrees.add(edgesToTree((LinkedList<Arete>)remainder.clone(),subTreeRoot));
 
 		return new Tree2D(root, subTrees);
+	}
+	
+	private Tree2D edgesToTree(LinkedList<Arete> aretes_K, Point root) {
+		LinkedList<Arete> aretes = new LinkedList<Arete>();
+		aretes.addAll(aretes_K);
+		return edgesToTreeAux(aretes, root);
 	}
 	
 	
@@ -299,22 +305,30 @@ public class DefaultTeam {
 		
 		private ArrayList<Point> points_acquis;
 		private ArrayList<Point> points_to_keep;
+		private ArrayList<Point> hit_points;
 		
 		private boolean can_evolve = true;
 	
 		
-		public Segment(int budget, Point point, ArrayList<Point> points_acquis, ArrayList<Point> points_to_keep) {
+		public Segment(int budget, Point point, ArrayList<Point> points_acquis, ArrayList<Point> points_to_keep, ArrayList<Point> hit_points) {
 			this.budget = budget;
 			this.last_point = point;
 			this.aretes_temp = new LinkedList<>();
 			this.aretes = new LinkedList<>();
 			
+			this.aretes = new LinkedList<>();
+			this.aretes_temp = new LinkedList<>();
+			
 			this.points_acquis = points_acquis;
 			this.points_to_keep = points_to_keep; 
+			this.hit_points = hit_points;
 		}
 		
 		public String toString() {
-			return  ( "aretes_temp : " + aretes_temp + "\n"
+			return  ( "---------------------------------\n"
+					+ "budget : " + budget + "\n"
+					+ "\n"
+					+ "aretes_temp : " + aretes_temp + "\n"
 					+ "last_point :  " + last_point + "\n"
 					+ "dist_act :    " + dist_act + "\n"
 					+ "val_act :     " + val_act  + "\n"
@@ -322,11 +336,20 @@ public class DefaultTeam {
 					+ "aretes :      " + aretes + "\n"
 					+ "dist_max :    " + dist_max + "\n"
 					+ "val_max :     " + val_max  + "\n"
+					+ "---------------------------------\n"
 					);
 		}
 		
 		public void addPoint(Point point, boolean is_hitpoint) {
-			if((dist_act + last_point.distance(point)) <= budget) {
+			System.out.println("----- dist_act : " + dist_act);
+			System.out.println("----- last_point.distance(point) : " + last_point.distance(point));
+			System.out.println("----- points_acquis.contains(last_point) : " + points_acquis.contains(last_point) + "           last_point : " + last_point);
+			System.out.println("----- points_acquis.contains(point) : " + points_acquis.contains(point) + "           point : " + point);
+			System.out.println("----- is_hitpoint : " + is_hitpoint);
+			System.out.println("----- Collections.disjoint(aretes_temp, points_to_keep) : " + Collections.disjoint(aretes_temp, points_to_keep));
+			System.out.println("-----");
+			
+			if((dist_act + last_point.distance(point)) <= budget) { ////// GROS PROBLEME AVEC last_point.distance(point) VU QU'Y EN A QU'ON AJOUTE PAS
 				if(!points_acquis.contains(last_point)
 				&& !points_acquis.contains(point)) {
 					
@@ -335,11 +358,12 @@ public class DefaultTeam {
 					if(is_hitpoint) val_act++;
 				} 
 				
-				if( can_evolve
+				// Pour pouvoir retenir un segment comme bon, il faut qu'il contienne un des points_to_keep
+				if( is_hitpoint
 				&& ((val_act > val_max || (val_act == val_max && dist_act < dist_max))
-					|| (Collections.disjoint(aretes, points_to_keep) && points_to_keep.contains(point)))) {
+					|| (!Collections.disjoint(aretes_temp, points_to_keep)))) {
 					
-					aretes = new LinkedList<>();
+					aretes.clear();// Peut etre tout supprimer pour pas surcharger le GC
 					aretes.addAll(aretes_temp);
 					val_max = val_act;
 					dist_max = dist_act;
@@ -348,12 +372,13 @@ public class DefaultTeam {
 				last_point = point;
 				
 			} else if(last_point.distance(point) > dist_act) {
-				aretes_temp = new LinkedList<>();
+				aretes_temp.clear();
 				dist_act = 0;
 				val_act = 0;
 				last_point = point;
 			} else {
-				while((dist_act + last_point.distance(point)) > budget) {
+				while((dist_act + last_point.distance(point)) > budget && !hit_points.contains(aretes_temp.getLast().p1)) {
+					/*
 					// si on retire un des points à garder et qu'il n'y en reste plus du tout dans aretes_temp
 					// -> ça veut dire qu'on part de l'arbre en construction et qu'on serait en train de
 					//	  construire une branche détachée de cet arbre
@@ -362,6 +387,7 @@ public class DefaultTeam {
 					   || points_to_keep.contains((aretes_temp.getLast().p2)))) {
 						can_evolve = false;
 					}
+					*/
 					
 					Arete temp = aretes_temp.removeLast();
 					dist_act -= temp.longueur; 
@@ -387,9 +413,10 @@ public class DefaultTeam {
 	
 	
 	public ArrayList<Segment> getSegmentCandidates(Tree2D arbre, int budget, ArrayList<Point> hitPoints, ArrayList<Point> points_acquis, ArrayList<Point> points_to_keep){
+		System.out.println("getSegmentCandidates : " + arbre.getRoot());
 		if(arbre.getSubTrees().size() == 0) {
 			ArrayList<Segment> result = new ArrayList<>();
-			result.add(new Segment(budget, arbre.getRoot(), points_acquis, points_to_keep));
+			result.add(new Segment(budget, arbre.getRoot(), points_acquis, points_to_keep, hitPoints));
 			return result;
 		}
 		ArrayList<Segment> result = new ArrayList<>();
@@ -397,6 +424,8 @@ public class DefaultTeam {
 		for(Tree2D fils : arbre.getSubTrees()) {
 			for(Segment segment : getSegmentCandidates(fils, budget, hitPoints, points_acquis, points_to_keep)) {
 				segment.addPoint(arbre.getRoot(), hitPoints.contains(arbre.getRoot()));
+				System.out.println("segment.val_max : " + segment.val_max);
+				System.out.println("segment.dist_max : " + segment.dist_max);
 				System.out.println(segment);
 				result.add(segment);
 			}
@@ -422,6 +451,7 @@ public class DefaultTeam {
 			int budget_actuel,
 			ArrayList<Pair<Point, Point>> visited_points, 
 			ArrayList<Point> hitPoints) {
+		/*
 		
 		ArrayList<Point> candidate_points = new ArrayList<>();
 		for(Segment segment : segments) {
@@ -483,6 +513,7 @@ public class DefaultTeam {
 					visited_points,
 					hitPoints);
 		}
+		*/
 		
 		
 		return null;
@@ -517,15 +548,25 @@ public class DefaultTeam {
 	}
 	
 	public ArrayList<Tree2D> getTreeExtremities(LinkedList<Arete> aretes){
+		
+		//System.out.println(aretes);
+		
 		ArrayList<Tree2D> points_to_start = new ArrayList<>();
 		Tree2D tree = edgesToTree(aretes, aretes.get(0).p1);
 		if(tree.getSubTrees().size() == 1) points_to_start.add(tree);
 		//points_to_start.add(tree);
 		
+		//System.out.println(aretes);
+		
 		ArrayList<Point> points = getPointsFromEdges(aretes);
 		
+		//System.out.println(points);
+		
 		for(Point point : points) {
+			//System.out.println(point + "\n\n" + tree);
 			Tree2D temp = getPointAsRootOfTree(tree, point);
+			//System.out.println(temp);
+			
 			if (temp.getSubTrees().size() == 0) {
 				points_to_start.add(edgesToTree(aretes, point));
 			}
@@ -562,6 +603,9 @@ public class DefaultTeam {
 		boolean finished = false;
 		
 		ArrayList<Tree2D> extremites = getTreeExtremities(aretes_finales);
+		for(Tree2D extremite : extremites) {
+			System.out.println(extremite.getRoot());
+		}
 		
 		LinkedList<Arete> aretes_acquises = new LinkedList<>();
 		ArrayList<Point> points_acquis = new ArrayList<>();
@@ -572,6 +616,8 @@ public class DefaultTeam {
 		
 		
 		while(!finished) {
+			System.out.println("=== NOUVELLE ITERATION === === === === === === === === === === === === ===");
+
 			// Il faudra qu'il y ait au moins 1 de ces points dans le segment final
 			ArrayList<Point> points_to_keep = new ArrayList<>();
 			
@@ -600,24 +646,62 @@ public class DefaultTeam {
 			
 
 			int score_max = 0;
-			Segment segment_max = new Segment(BUDGET, hitPoints.get(0));
+			int cout_max = Integer.MAX_VALUE;
+			// ((val_act > val_max || (val_act == val_max && dist_act < dist_max))
+			Segment segment_max = new Segment(BUDGET, hitPoints.get(0), points_acquis, points_to_keep, hitPoints);
+			
+			//System.out.println(extremites);
 			
 			for(Tree2D extremite : extremites) {
+				System.out.println("=== NOUVELLE EXTREMITE === === === === === === === === === === === === ===");
+				for(Tree2D subtree : extremite.getSubTrees()) {
+					System.out.println("subtree.getRoot() : " + subtree.getRoot());
+				}
 				ArrayList<Segment> segments = getSegmentCandidates(extremite, budget, hitPoints, points_acquis, points_to_keep);
 				for(Segment segment : segments) {
-					if(segment.aretes.size() > score_max) {
+					
+					System.out.println("segment.val_max : " + segment.val_max);
+					System.out.println("segment.dist_max : " + segment.dist_max);
+					System.out.println("score_max/cout_max : " + ((float)score_max/cout_max));
+					System.out.println("segment.val_max/segment.dist_max : " + ((float)segment.val_max/segment.dist_max));
+					//if(segment.val_max > score_max || (segment.val_max == score_max && segment.dist_max < cout_max)) {
+					if(segment.val_max > 0 && ((float)segment.val_max/segment.dist_max) > ((float)score_max/cout_max)) {
 						segment_max = segment;
-						score_max = segment.aretes.size();
+						score_max = segment.val_max;
+						cout_max = segment.dist_max;
 					}
 				}
+				System.out.println(segment_max);
+				System.out.println("racine extremite : " + extremite.getRoot());
+				System.out.println("arbre extremite : " + extremite);
+				System.out.println("points acquis : " + points_acquis);
+				System.out.println("points to keep : " + points_to_keep);
+				try {
+					Thread.sleep(250L);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
 			}
-			if(score_max == 0) System.out.println("Impossible de construire un arbre avec ce budget");
+			
+			if(score_max == 0) {
+				System.out.println(segment_max);
+				System.out.println("Impossible de construire un arbre avec ce budget");
+				break;
+			}
 			if(segment_max.dist_max == 0) break;
 			
 			budget -= segment_max.dist_max;
 			
 			aretes_acquises.addAll(segment_max.aretes);
 			points_acquis = getPointsFromEdges(aretes_acquises);
+			
+			try {
+				Thread.sleep(500L);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			
 		}
 		
@@ -632,6 +716,6 @@ public class DefaultTeam {
 		
 		
 		
-		return edgesToTree(segment_max.aretes, segment_max.aretes.get(0).p1);
+		return edgesToTree(aretes_acquises, points_acquis.get(0));
 	}
 }
