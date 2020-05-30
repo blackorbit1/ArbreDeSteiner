@@ -296,13 +296,21 @@ public class DefaultTeam {
 		public LinkedList<Arete> aretes;
 		public int dist_max = Integer.MAX_VALUE;
 		public int val_max = 0;
+		
+		private ArrayList<Point> points_acquis;
+		private ArrayList<Point> points_to_keep;
+		
+		private boolean can_evolve = true;
 	
 		
-		public Segment(int budget, Point point) {
+		public Segment(int budget, Point point, ArrayList<Point> points_acquis, ArrayList<Point> points_to_keep) {
 			this.budget = budget;
 			this.last_point = point;
 			this.aretes_temp = new LinkedList<>();
 			this.aretes = new LinkedList<>();
+			
+			this.points_acquis = points_acquis;
+			this.points_to_keep = points_to_keep; 
 		}
 		
 		public String toString() {
@@ -319,13 +327,18 @@ public class DefaultTeam {
 		
 		public void addPoint(Point point, boolean is_hitpoint) {
 			if((dist_act + last_point.distance(point)) <= budget) {
-				aretes_temp.addFirst(new Arete(last_point, point));
-				dist_act += last_point.distance(point);
-				if(is_hitpoint) val_act++;
+				if(!points_acquis.contains(last_point)
+				&& !points_acquis.contains(point)) {
+					
+					aretes_temp.addFirst(new Arete(last_point, point));
+					dist_act += last_point.distance(point);
+					if(is_hitpoint) val_act++;
+				} 
 				
-				
-				if(val_act > val_max 
-				|| (val_act == val_max && dist_act < dist_max)) {
+				if( can_evolve
+				&& ((val_act > val_max || (val_act == val_max && dist_act < dist_max))
+					|| (Collections.disjoint(aretes, points_to_keep) && points_to_keep.contains(point)))) {
+					
 					aretes = new LinkedList<>();
 					aretes.addAll(aretes_temp);
 					val_max = val_act;
@@ -337,18 +350,32 @@ public class DefaultTeam {
 			} else if(last_point.distance(point) > dist_act) {
 				aretes_temp = new LinkedList<>();
 				dist_act = 0;
-				//val_act = 0;
+				val_act = 0;
 				last_point = point;
 			} else {
 				while((dist_act + last_point.distance(point)) > budget) {
+					// si on retire un des points à garder et qu'il n'y en reste plus du tout dans aretes_temp
+					// -> ça veut dire qu'on part de l'arbre en construction et qu'on serait en train de
+					//	  construire une branche détachée de cet arbre
+					if(Collections.disjoint(aretes_temp, points_to_keep)
+					&& (points_to_keep.contains((aretes_temp.getLast().p1))
+					   || points_to_keep.contains((aretes_temp.getLast().p2)))) {
+						can_evolve = false;
+					}
+					
 					Arete temp = aretes_temp.removeLast();
-					dist_act -= temp.longueur;
-					//val_act--;
+					dist_act -= temp.longueur; 
+					val_act--;
+					
+					
 				}
 				
 				aretes_temp.addFirst(new Arete(last_point, point));
 				dist_act += last_point.distance(point);
 				val_act++;
+				
+				// Comme on ne peut qu'enlever du score dans ce if, 
+				// on ne vérifie pas si aretes_temp peut remplacer aretes
 				
 				last_point = point;
 			}
@@ -359,16 +386,16 @@ public class DefaultTeam {
 	}
 	
 	
-	public ArrayList<Segment> getSegmentCandidates(Tree2D arbre, int budget, ArrayList<Point> hitPoints){
+	public ArrayList<Segment> getSegmentCandidates(Tree2D arbre, int budget, ArrayList<Point> hitPoints, ArrayList<Point> points_acquis, ArrayList<Point> points_to_keep){
 		if(arbre.getSubTrees().size() == 0) {
 			ArrayList<Segment> result = new ArrayList<>();
-			result.add(new Segment(budget, arbre.getRoot()));
+			result.add(new Segment(budget, arbre.getRoot(), points_acquis, points_to_keep));
 			return result;
 		}
 		ArrayList<Segment> result = new ArrayList<>();
 		
 		for(Tree2D fils : arbre.getSubTrees()) {
-			for(Segment segment : getSegmentCandidates(fils, budget, hitPoints)) {
+			for(Segment segment : getSegmentCandidates(fils, budget, hitPoints, points_acquis, points_to_keep)) {
 				segment.addPoint(arbre.getRoot(), hitPoints.contains(arbre.getRoot()));
 				System.out.println(segment);
 				result.add(segment);
@@ -458,7 +485,7 @@ public class DefaultTeam {
 		}
 		
 		
-		return segments;
+		return null;
 		
 	}
 
@@ -489,6 +516,34 @@ public class DefaultTeam {
 		return edgesToTree(aretes_finales, aretes_finales.get(0).p1);
 	}
 	
+	public ArrayList<Tree2D> getTreeExtremities(LinkedList<Arete> aretes){
+		ArrayList<Tree2D> points_to_start = new ArrayList<>();
+		Tree2D tree = edgesToTree(aretes, aretes.get(0).p1);
+		if(tree.getSubTrees().size() == 1) points_to_start.add(tree);
+		//points_to_start.add(tree);
+		
+		ArrayList<Point> points = getPointsFromEdges(aretes);
+		
+		for(Point point : points) {
+			Tree2D temp = getPointAsRootOfTree(tree, point);
+			if (temp.getSubTrees().size() == 0) {
+				points_to_start.add(edgesToTree(aretes, point));
+			}
+		}
+		
+		return points_to_start;
+	}
+	
+	public ArrayList<Point> getPointsFromEdges(LinkedList<Arete> aretes){
+		ArrayList<Point> points = new ArrayList<>();
+		for(Arete arete : aretes) {
+			if(!points.contains(arete.p1)) points.add(arete.p1);
+			if(!points.contains(arete.p2)) points.add(arete.p2);
+		}
+		
+		return points;
+	}
+	
 	public Tree2D calculSteinerBudget(ArrayList<Point> points, int edgeThreshold, ArrayList<Point> hitPoints) {
 		// Execution des différentes étapes de steiner comme plus haut
 		int[][] matrice_directions = calculShortestPaths(points, edgeThreshold);
@@ -504,20 +559,77 @@ public class DefaultTeam {
 		// qui n'appartient qu'à une seule arete  (si on commence on milieu, ça ne sert à rien et regarder si 
 		// la racine qu'on s'apprete à examiner est pas en fait le bout d'un autre segment
 		
+		boolean finished = false;
+		
+		ArrayList<Tree2D> extremites = getTreeExtremities(aretes_finales);
+		
+		LinkedList<Arete> aretes_acquises = new LinkedList<>();
+		ArrayList<Point> points_acquis = new ArrayList<>();
+		
+		int budget = BUDGET;
+		
 		Tree2D tree = edgesToTree(aretes_finales, hitPoints.get(0));
-		ArrayList<Segment> segments = getSegmentCandidates(tree, BUDGET, hitPoints);
 		
-		int score_max = 0;
-		Segment segment_max = new Segment(BUDGET, hitPoints.get(0));
 		
-		for(Segment segment : segments) {
-			if(segment.aretes.size() > score_max) {
-				segment_max = segment;
-				score_max = segment.aretes.size();
+		while(!finished) {
+			// Il faudra qu'il y ait au moins 1 de ces points dans le segment final
+			ArrayList<Point> points_to_keep = new ArrayList<>();
+			
+			//Il faudra chercher le meilleur segment à partir de chacun de ces extremités 
+			// -> On va donc en faire des racines d'un arbre qu'on va parcourir
+			ArrayList<Tree2D> points_to_start = new ArrayList<>();
+			points_to_start.add(tree);
+			
+			for(Point point : points_acquis) {
+				Tree2D temp = getPointAsRootOfTree(tree, point);
+				if(temp.getSubTrees().size() >= 2) {
+					boolean is_all_taken = true;
+					for(Tree2D subtree : temp.getSubTrees()) {
+						
+						if(!(points_acquis.contains(point)
+						  && points_acquis.contains(subtree.getRoot()))) {
+							is_all_taken = false;
+							// on peut faire candidate_roots.add(point) ; break
+						}
+						
+					}
+					
+					if(!is_all_taken) points_to_keep.add(point);
+				} 
 			}
+			
+
+			int score_max = 0;
+			Segment segment_max = new Segment(BUDGET, hitPoints.get(0));
+			
+			for(Tree2D extremite : extremites) {
+				ArrayList<Segment> segments = getSegmentCandidates(extremite, budget, hitPoints, points_acquis, points_to_keep);
+				for(Segment segment : segments) {
+					if(segment.aretes.size() > score_max) {
+						segment_max = segment;
+						score_max = segment.aretes.size();
+					}
+				}
+			}
+			if(score_max == 0) System.out.println("Impossible de construire un arbre avec ce budget");
+			if(segment_max.dist_max == 0) break;
+			
+			budget -= segment_max.dist_max;
+			
+			aretes_acquises.addAll(segment_max.aretes);
+			points_acquis = getPointsFromEdges(aretes_acquises);
+			
 		}
 		
-		if(score_max == 0) System.out.println("Impossible de construire un arbre avec ce budget");
+		
+		
+		
+		
+		
+		
+		
+		
+		
 		
 		
 		return edgesToTree(segment_max.aretes, segment_max.aretes.get(0).p1);
