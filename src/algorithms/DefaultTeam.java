@@ -341,13 +341,15 @@ public class DefaultTeam {
 		}
 		
 		public void addPoint(Point point, boolean is_hitpoint) {
+			System.out.println("----- adresse : " + super.toString());
 			System.out.println("----- dist_act : " + dist_act);
 			System.out.println("----- last_point.distance(point) : " + last_point.distance(point));
 			System.out.println("----- points_acquis.contains(last_point) : " + points_acquis.contains(last_point) + "           last_point : " + last_point);
 			System.out.println("----- points_acquis.contains(point) : " + points_acquis.contains(point) + "           point : " + point);
 			System.out.println("----- is_hitpoint : " + is_hitpoint);
-			System.out.println("----- Collections.disjoint(aretes_temp, points_to_keep) : " + Collections.disjoint(aretes_temp, points_to_keep));
-			System.out.println("-----");
+			System.out.println("----- has_common_elements(aretes_temp, points_acquis) : " + has_common_elements(aretes_temp, points_acquis));
+			System.out.println("----- aretes_temp : " + aretes_temp);
+			System.out.println("----- points_acquis : " + points_acquis);
 			
 			if((dist_act + last_point.distance(point)) <= budget) { ////// GROS PROBLEME AVEC last_point.distance(point) VU QU'Y EN A QU'ON AJOUTE PAS
 				if(!points_acquis.contains(last_point)
@@ -361,7 +363,8 @@ public class DefaultTeam {
 				// Pour pouvoir retenir un segment comme bon, il faut qu'il contienne un des points_to_keep
 				if( is_hitpoint
 				&& ((val_act > val_max || (val_act == val_max && dist_act < dist_max))
-					|| (!Collections.disjoint(aretes_temp, points_to_keep)))) {
+					&& (points_acquis.size() == 0 || has_common_elements(aretes_temp, points_acquis)))) {
+					//|| (!Collections.disjoint(aretes_temp, points_to_keep)))) {
 					
 					aretes.clear();// Peut etre tout supprimer pour pas surcharger le GC
 					aretes.addAll(aretes_temp);
@@ -371,12 +374,16 @@ public class DefaultTeam {
 				
 				last_point = point;
 				
-			} else if(last_point.distance(point) > dist_act) {
+			} else if(last_point.distance(point) > budget) {
 				aretes_temp.clear();
 				dist_act = 0;
 				val_act = 0;
 				last_point = point;
 			} else {
+				System.out.println(">>>> " + last_point.distance(point) + "     " + budget + "     " + dist_act);
+				System.out.println(">>>> " + last_point);
+				System.out.println(">>>> " + point);
+				System.out.println(">>>> " + hit_points);
 				while((dist_act + last_point.distance(point)) > budget && !hit_points.contains(aretes_temp.getLast().p1)) {
 					/*
 					// si on retire un des points à garder et qu'il n'y en reste plus du tout dans aretes_temp
@@ -435,6 +442,14 @@ public class DefaultTeam {
 		
 	}
 	
+	public boolean has_common_elements(LinkedList<Arete> aretes, ArrayList<Point> points) {
+		for(Arete arete : aretes) {
+			if(points.contains(arete.p1)) return true;
+			if(points.contains(arete.p2)) return true;
+		}
+		return false;
+	}
+
 	public Tree2D getPointAsRootOfTree(Tree2D arbre, Point point) {
 		if(point.equals(arbre.getRoot())) return arbre;
 		for(Tree2D fils : arbre.getSubTrees()) {
@@ -443,86 +458,6 @@ public class DefaultTeam {
 		}
 		return null;
 	}
-	
-	public ArrayList<Arete> getBestBudgetedTree(
-			Tree2D arbre, 
-			ArrayList<Segment> segments, 
-			int score_actuel, 
-			int budget_actuel,
-			ArrayList<Pair<Point, Point>> visited_points, 
-			ArrayList<Point> hitPoints) {
-		/*
-		
-		ArrayList<Point> candidate_points = new ArrayList<>();
-		for(Segment segment : segments) {
-			for(Arete arete : segment.aretes) {
-				if(!candidate_points.contains(arete.p1)) candidate_points.add(arete.p1);
-				if(!candidate_points.contains(arete.p2)) candidate_points.add(arete.p2);
-			}
-		}
-		
-		ArrayList<Tree2D> candidate_roots = new ArrayList<>();
-		for(Point point : candidate_points) {
-			Tree2D temp = getPointAsRootOfTree(arbre, point);
-			if(temp.getSubTrees().size() >= 2) {
-				for(Tree2D subtree : temp.getSubTrees()) {
-					boolean is_new = true;
-					for(Pair<Point, Point> paire : visited_points) {
-						if(paire.equals(new Pair<>(point, subtree.getRoot()))
-						|| paire.equals(new Pair<>(subtree.getRoot(), point))) is_new = false;
-					}
-					if (is_new) {
-						ArrayList<Tree2D> temp_list = new ArrayList<>();
-						temp_list.add(subtree);
-						candidate_roots.add(new Tree2D(point, temp_list));
-						visited_points.add(new Pair<>(point, subtree.getRoot()));
-					}
-					
-				}
-				
-				candidate_roots.add(temp);
-			}
-		}
-		
-		int score_max = 0;
-		
-		
-		Segment segment_max = new Segment(budget_actuel, hitPoints.get(0));
-		
-		for(Tree2D arbre_to_visit : candidate_roots) {
-			ArrayList<Segment> segments_candidate = getSegmentCandidates(arbre_to_visit, budget_actuel, hitPoints);
-			
-			
-			
-			for(Segment segment : segments_candidate) {
-				if(segment.aretes.size() > score_max) {
-					segment_max = segment;
-					score_max = segment.aretes.size();
-				}
-			}
-		}
-		
-		
-		if(score_max > 0) {
-			segments.add(segment_max);
-			return getBestBudgetedTree(
-					arbre,
-					segments, 
-					score_actuel + score_max,
-					budget_actuel - segment_max.dist_max,
-					visited_points,
-					hitPoints);
-		}
-		*/
-		
-		
-		return null;
-		
-	}
-
-
-	
-	
 	
 	
 	
