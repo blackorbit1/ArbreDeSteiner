@@ -9,7 +9,6 @@ import java.util.LinkedList;
 
 
 public class DefaultTeam {
-	private static final int BUDGET = 1664;
 	
 	/////////////////////////////////////////////// 
 	///////////////////////////////////////////////
@@ -101,6 +100,11 @@ public class DefaultTeam {
 		}
 	}
 
+	/**
+	 * 
+	 * Objet permettant la gestion de labels de sous graphes
+	 *
+	 */
 	private class Label {
 		private ArrayList<Point> points;
 		private int[] label;
@@ -128,24 +132,26 @@ public class DefaultTeam {
 	
 	
 	private Tree2D edgesToTreeAux(LinkedList<Arete> aretes_K, Point root) {
-		LinkedList<Arete> remainder = new LinkedList<Arete>();
-		ArrayList<Point> subTreeRoots = new ArrayList<Point>();
+		LinkedList<Arete> reste = new LinkedList<Arete>();
+		ArrayList<Point> fils_points = new ArrayList<Point>();
 		Arete current;
-		while (aretes_K.size()!=0) {
-			current = aretes_K.remove(0);
+		while (aretes_K.size() > 0) {
+			current = aretes_K.removeFirst();
 			if (current.p1.equals(root)) {
-				subTreeRoots.add(current.p2);
+				fils_points.add(current.p2);
 			} else {
 				if (current.p2.equals(root)) {
-					subTreeRoots.add(current.p1);
+					fils_points.add(current.p1);
 				} else {
-					remainder.add(current);
+					reste.add(current);
 				}
 			}
 		}
 
 		ArrayList<Tree2D> subTrees = new ArrayList<Tree2D>();
-		for (Point subTreeRoot: subTreeRoots) subTrees.add(edgesToTree((LinkedList<Arete>)remainder.clone(),subTreeRoot));
+		for (Point fils_point: fils_points) {
+			subTrees.add(edgesToTree((LinkedList<Arete>)reste.clone(),fils_point));
+		}
 
 		return new Tree2D(root, subTrees);
 	}
@@ -214,6 +220,23 @@ public class DefaultTeam {
 		}
 
 		// On trouve le meilleur chemin pour chaque paire de points de S
+		//
+		//                 ______
+		//  p1.__.______._/      \        ______. p2
+		//       .      .         \______/
+		//      /|\    /|\
+		//       |      |
+		//    current   |
+		//     point   temp
+		//
+		//  current_point commence à p1
+		//  temp va jusqu'à p2 avec toujours une arete d'avance sur p1
+		//
+		// 	On crée une arete p1 et p2 pour chaque couple de points de S 
+		//  On parcourt chaque points du chemin le plus court entre p1 et p2 sur G
+		//  en incrémentant la distance de l'arete (p1, p2)
+		//  -> Ici, la distance entre current_point et temp
+
 		for(Point p1 : points_s) {
 			for(Point p2 : points_s) {
 				if(!deja_vu.get(p2).contains(p1)) {
@@ -245,12 +268,26 @@ public class DefaultTeam {
 		HashMap<Point,ArrayList<Point>> adj = new HashMap<>();
 		for(Point point : points_g) adj.put(point, new ArrayList<>());
 		
-		Collections.reverse(aretes_s);
+		//Collections.reverse(aretes_s);
 
-		
+		// Pour chaque arete de S allant de p1 à p2, on va enregistrer toutes les aretes et les points
+		// permettant d'aller de p1 à p2 sur G
 		for(Arete arete : aretes_s) {
 			Point current_point = arete.p1;
 			if(!points_res.contains(arete.p2)) points_res.add(arete.p2);
+			
+			//                 ______
+			//  p1.__.______._/      \        ______. p2
+			//       .      .         \______/
+			//      /|\    /|\
+			//       |      |
+			//    current   |
+			//     point   temp
+			//
+			//  current_point commence à p1
+			//  temp va jusqu'à p2 avec toujours une arete d'avance sur p1
+			//
+			// 	pour chaque couple (p1,p2), on ajoute l'adjacence entre chaque points que constitue leur lien sur G
 			
 			while(!current_point.equals(arete.p2)) {
 				Point temp = points_g.get(matrice_directions[points_g.indexOf(current_point)][points_g.indexOf(arete.p2)]);
@@ -262,6 +299,12 @@ public class DefaultTeam {
 				if(!points_res.contains(current_point)) points_res.add(current_point);
 			}
 		}
+		
+		// On transforme la liste d'adjacence en aretes
+		//
+		// -> On n'a pas enregistré les aretes directement lors du parcours des points effectué au dessus
+		//    pour ne pas avoir à faire la couteuse vérification, à chaque ajout d'arete, qu'il n'y a pas 
+		//    la même arete mais avec p1 et p2 intervertis
 		
 		for(Point p1 : adj.keySet()) {
 			for(Point p2 : adj.get(p1)) {
@@ -314,13 +357,8 @@ public class DefaultTeam {
 	
 
 	
-	
-	
-	
-
-	
 	/**
-	 * Algorithme de kruskal
+	 *  Algorithme de Kruskal
 	 * 
 	 * @param points (tous les points du graphe)
 	 * @param aretes_original (toutes les aretes du graphe)
@@ -391,9 +429,16 @@ public class DefaultTeam {
 		return result;
 	}
 	
-	
-	
-	public Tree2D calculSteiner(ArrayList<Point> points, int edgeThreshold, ArrayList<Point> hitPoints) {
+	/**
+	 *  Algorithme de construction d'une approximation d'un arbre de Steiner
+	 *  
+	 * @param points (points du graphe)
+	 * @param edgeThreshold (distance en dessous de laquelle il y a une arete entre deux points)
+	 * @param hitPoints (points à traverser)
+	 * 
+	 * @return la liste d'aretes constituant l'arbre de Steiner
+	 */
+	public LinkedList<Arete> simpleSteiner(ArrayList<Point> points, int edgeThreshold, ArrayList<Point> hitPoints){
 		int[][] matrice_directions = calculShortestPaths(points, edgeThreshold);
 		
 		// Construction de l'arbre K
@@ -408,28 +453,24 @@ public class DefaultTeam {
 		LinkedList<Arete> aretes_H = (LinkedList<Arete>) paire.second;
 		
 		// Kruskal sur H
-		LinkedList<Arete> aretes_finales = kruskal(points_H, aretes_H);
-		
-
-		return edgesToTree(aretes_finales, aretes_finales.get(0).p1);
+		return kruskal(points_H, aretes_H);
 	}
 	
-	
-	
-	public Tree2D calculSteinerBudget(ArrayList<Point> points, int edgeThreshold, ArrayList<Point> hitPoints) {
-		
-		// Execution des différentes étapes de steiner comme plus haut
+	/**
+	 *  Algorithme de construction d'une approximation d'un arbre de Steiner avec un budget donné
+	 *  
+	 * @param points
+	 * @param edgeThreshold
+	 * @param hitPoints
+	 * @return
+	 */
+	public LinkedList<Arete> budgetSteiner(ArrayList<Point> points, int edgeThreshold, ArrayList<Point> hitPoints, Point mother_house, int budget){
+		// On appelle la méthode permettant de creer une arbre de Steiner
+		LinkedList<Arete> aretes_steiner = simpleSteiner(points, edgeThreshold, hitPoints);
 
-		int[][] matrice_directions = calculShortestPaths(points, edgeThreshold);
-		LinkedList<Arete> aretes_S = getAretesS(points, hitPoints, matrice_directions);
-		LinkedList<Arete> aretes_K = kruskal(hitPoints, aretes_S);
-		Pair<ArrayList<Point>, LinkedList<Arete>> paire = applyT0toG(points, getAretesFromPoints(points, edgeThreshold), hitPoints, aretes_K, matrice_directions);
-		LinkedList<Arete> aretes_sans_budget = kruskal(paire.first, paire.second);
-		
 		
 		// On recupere les liens entre chaque hitpoints
-		LinkedList<Link> links = getLinks(edgesToTree(aretes_sans_budget, hitPoints.get(0)), new LinkedList<Arete>(), hitPoints);
-		
+		LinkedList<Link> links = getLinks(edgesToTree(aretes_steiner, hitPoints.get(0)), new LinkedList<Arete>(), hitPoints);
 		
 		// On calcule le cout de cet arbre et on ajoute toutes les aretes dans une liste qui sera retourné à la fin de la fonction
 		LinkedList<Arete> aretes_finales = new LinkedList<>();
@@ -440,9 +481,8 @@ public class DefaultTeam {
 			cout += link.longueur;
 		}
 		
-		
 		// tant qu'on est au dessus du budget
-		while(cout > BUDGET) {
+		while(cout > budget) {
 			// On récupere les extremités de l'arbre
 			HashMap<Point, Integer> occurence_points = new HashMap<>();
 			for(Link link : links) {
@@ -464,6 +504,12 @@ public class DefaultTeam {
 			
 			// On retire le lien entre deux hitpoints le plus couteux
 			Link link_to_remove = links_candidates.getLast();
+			
+			// Si jamais on se rend compte que le lien le plus couteux contient le point "maison mere", on en cherche un moins couteux qui ne le contienne pas
+			if(link_to_remove.p1.equals(mother_house) || link_to_remove.p2.equals(mother_house))
+				for(int i = links_candidates.size() - 1; link_to_remove.p1.equals(mother_house) || link_to_remove.p2.equals(mother_house); i--)
+					link_to_remove = links_candidates.get(i);
+
 			for(Arete arete : link_to_remove.aretes) {
 				aretes_finales.remove(arete);
 				cout -= arete.longueur;
@@ -471,6 +517,46 @@ public class DefaultTeam {
 			links.remove(link_to_remove);
 		}
 		
-		return edgesToTree(aretes_finales, aretes_finales.get(0).p1);
+		return aretes_finales;
+		
 	}
+	
+	///////////////////////////////////////////////////////////////////
+	///////////////////////////////////////////////////////////////////
+	///////      							                    ///////
+	///////         méthodes appellées par le programme         ///////
+	///////      							                    ///////
+	///////////////////////////////////////////////////////////////////
+	///////////////////////////////////////////////////////////////////
+	
+	
+	/**
+	 * Méthode appellée par le programme pour construire un arbre de steiner sans budget
+	 */
+	public Tree2D calculSteiner(ArrayList<Point> points, int edgeThreshold, ArrayList<Point> hitPoints) {
+		// On appelle la méthode permettant de creer une arbre de Steiner
+		LinkedList<Arete> aretes_steiner = simpleSteiner(points, edgeThreshold, hitPoints);
+
+		return edgesToTree(aretes_steiner, aretes_steiner.get(0).p1);
+	}
+	
+	/**
+	 * Méthode appellée par le programme pour construire un arbre de steiner avec budget
+	 */
+	public Tree2D calculSteinerBudget(ArrayList<Point> points, int edgeThreshold, ArrayList<Point> hitPoints) {
+		// Point "maison mere"
+		Point mother_house = hitPoints.get(0);
+		
+		// Budget
+		int budget = 1664;
+		
+		
+		LinkedList<Arete> aretes_steiner = budgetSteiner(points, edgeThreshold, hitPoints, mother_house, budget);
+		
+		
+		return edgesToTree(aretes_steiner, aretes_steiner.get(0).p1);
+		
+	}
+	
+	
 }
