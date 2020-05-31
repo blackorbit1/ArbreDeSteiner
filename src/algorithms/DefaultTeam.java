@@ -12,9 +12,9 @@ public class DefaultTeam {
 	
 	/////////////////////////////////////////////// 
 	///////////////////////////////////////////////
-	///////      							///////
+	///////                                 ///////
 	///////         Nouveaux Objets         ///////
-	///////      							///////
+	///////                                 ///////
 	///////////////////////////////////////////////
 	///////////////////////////////////////////////
 	
@@ -124,9 +124,9 @@ public class DefaultTeam {
 	
 	////////////////////////////////////////////////////
 	////////////////////////////////////////////////////
-	///////      							     ///////
+	///////                                      ///////
 	///////         méthodes utilitaires         ///////
-	///////      							     ///////
+	///////                                      ///////
 	////////////////////////////////////////////////////
 	////////////////////////////////////////////////////
 	
@@ -201,9 +201,9 @@ public class DefaultTeam {
 	
 	/////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////
-	///////      							              ///////
+	///////                                               ///////
 	///////         étapes de calculs du résultat         ///////
-	///////      							              ///////
+	///////                                               ///////
 	/////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////
 	
@@ -481,6 +481,8 @@ public class DefaultTeam {
 			cout += link.longueur;
 		}
 		
+		LinkedList<Link> links_retirees = new LinkedList<>();
+		
 		// tant qu'on est au dessus du budget
 		while(cout > budget) {
 			// On récupere les extremités de l'arbre
@@ -502,6 +504,7 @@ public class DefaultTeam {
 			// On les tries
 			links_candidates.sort((o1, o2) -> o1.longueur.compareTo(o2.longueur));
 			
+			
 			// On retire le lien entre deux hitpoints le plus couteux
 			Link link_to_remove = links_candidates.getLast();
 			
@@ -510,11 +513,39 @@ public class DefaultTeam {
 				for(int i = links_candidates.size() - 1; link_to_remove.p1.equals(mother_house) || link_to_remove.p2.equals(mother_house); i--)
 					link_to_remove = links_candidates.get(i);
 
-			for(Arete arete : link_to_remove.aretes) {
-				aretes_finales.remove(arete);
-				cout -= arete.longueur;
-			}
+			// On retire toutes les aretes du lien retiré
+			aretes_finales.removeAll(link_to_remove.aretes);
+			cout -= link_to_remove.longueur;
+			
+			links_retirees.add(link_to_remove);
 			links.remove(link_to_remove);
+			
+			
+			// On vérifie si le retrait de toutes ces aretes ne permet pas le replacement d'un
+			// ancien lien moins couteux
+			
+			Link link_to_reuse = links_retirees.get(0);
+			Double cost_link_to_reuse = Double.MAX_VALUE;
+			
+			
+			for(Link link : links_retirees) {
+				if((occurence_points.containsKey(link.p1) || occurence_points.containsKey(link.p2))
+						&& (cout + link.longueur) <= budget
+						&& link.longueur < cost_link_to_reuse) {
+					link_to_reuse = link;
+					cost_link_to_reuse = link.longueur;
+				}
+			}
+			
+			if(cost_link_to_reuse != Double.MAX_VALUE) {
+				links.add(link_to_reuse);
+				aretes_finales.addAll(link_to_reuse.aretes);
+				
+				links_retirees.remove(link_to_reuse);
+				cout += link_to_reuse.longueur;
+			}
+			
+			
 		}
 		
 		return aretes_finales;
@@ -523,9 +554,9 @@ public class DefaultTeam {
 	
 	///////////////////////////////////////////////////////////////////
 	///////////////////////////////////////////////////////////////////
-	///////      							                    ///////
+	///////                                                     ///////
 	///////         méthodes appellées par le programme         ///////
-	///////      							                    ///////
+	///////                                                     ///////
 	///////////////////////////////////////////////////////////////////
 	///////////////////////////////////////////////////////////////////
 	
@@ -555,8 +586,5 @@ public class DefaultTeam {
 		
 		
 		return edgesToTree(aretes_steiner, aretes_steiner.get(0).p1);
-		
 	}
-	
-	
 }
